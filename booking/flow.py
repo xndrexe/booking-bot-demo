@@ -11,16 +11,18 @@ booking/maxbot.py только переводят это в вызовы сво�
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field, replace
 from datetime import date, datetime, timedelta
 from html import escape
+from typing import Protocol
 
 from booking import texts
 from booking.catalog import Catalog
 from booking.db import ACTIVE, Appointment, Client, Storage
-from booking.export import build_xlsx
+from booking.export import build_xlsx, rows
 from booking.slots import free_by_time, open_days
 
 log = logging.getLogger(__name__)
@@ -47,6 +49,10 @@ class Reply:
 Sender = Callable[[str, Reply], Awaitable[None]]
 
 
+class SheetSink(Protocol):
+    def push(self, rows: list[list]) -> None: ...
+
+
 def _rows(buttons: list[Button], per_row: int) -> list[list[Button]]:
     return [buttons[i : i + per_row] for i in range(0, len(buttons), per_row)]
 
@@ -63,12 +69,15 @@ class BookingBot:
         *,
         admins: set[str],
         clock: Callable[[], datetime],
+        sheet: SheetSink | None = None,
     ):
-        """admins — ключи вида "tg:123456" или "max:987"; clock — локальное время салона."""
+        """admins — ключи вида "tg:123456" или "max:987"; clock — локальное время салона;
+        sheet — Google Таблица, куда копируются записи (необязательно)."""
         self.catalog = catalog
         self.storage = storage
         self.admins = admins
         self.clock = clock
+        self.sheet = sheet
         self.senders: dict[str, Sender] = {}
 
     def now(self) -> datetime:
@@ -303,6 +312,7 @@ class BookingBot:
                 )
             ]
         self._save(replace(client, draft={}), state=None)
+        await self._sync_sheet()
         await self._notify_admins(f"🆕 Новая запись\n\n{self._describe(appt, with_client=True)}")
         biz = self.catalog.business
         return [
@@ -351,6 +361,7 @@ class BookingBot:
         if appt is None:
             return [Reply("Эта запись уже отменена или прошла.", [_back("my")])]
         self.storage.cancel(appt.id)
+        await self._sync_sheet()
         await self._notify_admins(f"❌ Клиент отменил запись\n\n{self._describe(appt, with_client=True)}")
         return [
             Reply(
@@ -389,6 +400,16 @@ class BookingBot:
             for a in items
         ]
         return Reply("Записи на сегодня:\n\n" + "\n".join(lines), [_back("menu")])
+
+    async def _sync_sheet(self) -> None:
+        if self.sheet is None:
+            return
+        data = rows(self.catalog, self.storage.all_appointments())
+        try:
+            # gspread синхронный — уводим в поток, чтобы бот не замирал на время запроса
+            await asyncio.to_thread(self.sheet.push, data)
+        except Exception:
+            log.warning("google sheet sync failed", exc_info=True)
 
     async def _notify_admins(self, text: str) -> None:
         for key in sorted(self.admins):

@@ -33,11 +33,18 @@ async def main() -> None:
     catalog = load_catalog(settings.catalog_path)
     tz = ZoneInfo(catalog.business.timezone)
     settings.db_path.parent.mkdir(parents=True, exist_ok=True)
+    sheet = None
+    if settings.gsheet_id and settings.google_credentials:
+        from booking.gsheet import GoogleSheet
+
+        sheet = GoogleSheet(settings.gsheet_id, settings.google_credentials)
+        log.info("google sheet: on")
     core = BookingBot(
         catalog,
         Storage(settings.db_path),
         admins=settings.admins,
         clock=lambda: datetime.now(tz).replace(tzinfo=None),
+        sheet=sheet,
     )
 
     runners = []

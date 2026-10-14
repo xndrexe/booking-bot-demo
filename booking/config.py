@@ -18,6 +18,8 @@ class Settings:
     admins: set[str]
     db_path: Path
     catalog_path: Path
+    gsheet_id: str | None
+    google_credentials: str | None
 
 
 def load_settings() -> Settings:
@@ -29,4 +31,6 @@ def load_settings() -> Settings:
         admins=admins,
         db_path=Path(os.getenv("DB_PATH", ROOT / "data" / "booking.db")),
         catalog_path=Path(os.getenv("CATALOG_PATH", ROOT / "data" / "catalog.json")),
+        gsheet_id=os.getenv("GSHEET_ID") or None,
+        google_credentials=os.getenv("GOOGLE_CREDENTIALS") or None,
     )
