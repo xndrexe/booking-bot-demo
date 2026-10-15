@@ -7,6 +7,17 @@ from datetime import date
 from booking.export import COLUMNS
 
 SHEET_TITLE = "Записи"
+# с этих знаков Google Таблица в режиме USER_ENTERED начинает формулу
+FORMULA_START = ("=", "+", "-", "@")
+
+
+def _cell(value):
+    if isinstance(value, date):
+        return value.strftime("%d.%m.%Y")
+    if isinstance(value, str) and value.startswith(FORMULA_START):
+        # апостроф велит таблице хранить строку как текст; сам он в ячейке не виден
+        return "'" + value
+    return value
 
 
 class GoogleSheet:
@@ -31,7 +42,7 @@ class GoogleSheet:
 
     def push(self, rows: list[list]) -> None:
         """Перезаписывает лист целиком: записей у салона немного, зато лист всегда совпадает с базой."""
-        values = [[c.strftime("%d.%m.%Y") if isinstance(c, date) else c for c in r] for r in rows]
+        values = [[_cell(c) for c in r] for r in rows]
         ws = self._worksheet()
         ws.clear()
         ws.update([[title for title, _ in COLUMNS], *values], value_input_option="USER_ENTERED")

@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import unicodedata
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field, replace
 from datetime import date, datetime, timedelta
@@ -150,7 +151,8 @@ class BookingBot:
                     return [self._export()]
                 case "today" if self.is_admin(platform, user_id):
                     return [self._today()]
-        except (IndexError, ValueError, KeyError):
+        except (IndexError, ValueError, KeyError, OverflowError):
+            # OverflowError — подделанный id длиннее, чем влезает в INTEGER SQLite
             log.warning("bad callback data %r from %s:%s", data, platform, user_id)
         return [self._menu(platform, user_id)]
 
@@ -243,7 +245,9 @@ class BookingBot:
         return Reply("Как к вам обращаться? Напишите имя.", [_back("menu", "✖️ Отмена")])
 
     def _take_name(self, client: Client, text: str) -> Reply:
-        name = " ".join(text.split())
+        # невидимые и управляющие символы (смена направления текста, нулевая ширина) подделывают вид
+        # уведомления владельцу — выбрасываем их до проверки длины
+        name = " ".join("".join(ch for ch in text if unicodedata.category(ch) not in ("Cc", "Cf")).split())
         if not 2 <= len(name) <= 40:
             return Reply("Имя должно быть от 2 до 40 символов. Напишите ещё раз.")
         self._save(replace(client, name=name), state=ASK_PHONE)

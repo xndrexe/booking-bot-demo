@@ -63,6 +63,10 @@ def build_xlsx(catalog: Catalog, appointments: list[Appointment]) -> bytes:
 
     for row in rows(catalog, appointments):
         ws.append(row)
+        for cell in ws[ws.max_row]:
+            # openpyxl делает формулой любую строку с «=»; имя клиента — чужой ввод, пусть будет текстом
+            if isinstance(cell.value, str) and cell.value.startswith("="):
+                cell.data_type = "s"
         ws.cell(row=ws.max_row, column=2).number_format = "DD.MM.YYYY"
         ws.cell(row=ws.max_row, column=8).number_format = "#,##0"
 
