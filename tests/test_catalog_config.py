@@ -60,6 +60,20 @@ def test_load_catalog_rejects_unknown_service(tmp_path):
         load_catalog(write_catalog(tmp_path, [master(services=[1, 7])]))
 
 
+@pytest.mark.parametrize(
+    ("over", "error"),
+    [
+        ({"start": "18:00", "end": "09:30"}, "must be before end"),
+        ({"start": "10:00", "end": "10:00"}, "must be before end"),
+        ({"weekdays": [0, 1]}, "weekdays must be 1..7"),
+        ({"weekdays": []}, "weekdays must be 1..7"),
+    ],
+)
+def test_load_catalog_rejects_bad_schedule(tmp_path, over, error):
+    with pytest.raises(ValueError, match=error):
+        load_catalog(write_catalog(tmp_path, [master(**over)]))
+
+
 def test_demo_catalog_masters_cover_every_service(catalog):
     for service_id in catalog.services:
         assert catalog.masters_for(service_id), service_id

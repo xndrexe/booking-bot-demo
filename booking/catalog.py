@@ -68,4 +68,9 @@ def load_catalog(path: Path) -> Catalog:
         unknown = master.services - services.keys()
         if unknown:
             raise ValueError(f"master {master.id} references unknown services {sorted(unknown)}")
+        # ошибку в графике владелец должен увидеть при запуске, а не по пустому списку окон
+        if master.start >= master.end:
+            raise ValueError(f"master {master.id}: start {master.start} must be before end {master.end}")
+        if not master.weekdays or not master.weekdays <= set(range(1, 8)):
+            raise ValueError(f"master {master.id}: weekdays must be 1..7, got {sorted(master.weekdays)}")
     return Catalog(business=Business(**raw["business"]), services=services, masters=masters)
