@@ -291,6 +291,16 @@ class BookingBot:
         if start <= self.now():
             self._save(replace(client, draft={}), state=None)
             return [Reply("Это время уже прошло — выберите новое.", [[Button("📝 Записаться", "book")]])]
+        # черновик мог пролежать долго: правило «не позже чем за min_lead_min до визита» проверяем снова
+        if start < self.now() + timedelta(minutes=self.catalog.business.min_lead_min):
+            return [
+                self._times(
+                    service.id,
+                    draft["chosen_master_id"],
+                    start.date(),
+                    note="До визита осталось слишком мало времени. Выберите другое.\n\n",
+                )
+            ]
         appt = self.storage.book(
             platform=client.platform,
             user_id=client.user_id,

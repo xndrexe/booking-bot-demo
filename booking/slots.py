@@ -17,9 +17,12 @@ def free_starts(
     now: datetime,
 ) -> list[datetime]:
     """Времена начала, на которые к мастеру можно записаться на эту услугу в этот день."""
+    biz = catalog.business
+    # кнопку с любой датой можно прислать вручную — горизонт записи проверяем здесь, а не только в open_days
+    if not 0 <= (day - now.date()).days < biz.booking_days:
+        return []
     if day.isoweekday() not in master.weekdays:
         return []
-    biz = catalog.business
     opens = datetime.combine(day, master.start)
     closes = datetime.combine(day, master.end)
     duration = timedelta(minutes=service.duration_min)
