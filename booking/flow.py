@@ -54,12 +54,16 @@ class SheetSink(Protocol):
     def push(self, rows: list[list]) -> None: ...
 
 
-def _rows(buttons: list[Button], per_row: int) -> list[list[Button]]:
+def _grid(buttons: list[Button], per_row: int) -> list[list[Button]]:
     return [buttons[i : i + per_row] for i in range(0, len(buttons), per_row)]
 
 
 def _back(data: str, text: str = "« Назад") -> list[Button]:
     return [Button(text, data)]
+
+
+def _gone() -> Reply:
+    return Reply("Эта запись уже отменена или прошла.", [_back("my")])
 
 
 class BookingBot:
@@ -206,7 +210,7 @@ class BookingBot:
         if not days:
             return Reply("На ближайшие две недели свободных окон нет — выберите другого мастера.", [back])
         buttons = [Button(texts.day_button(d), f"d:{service_id}:{master_id}:{d:%Y%m%d}") for d in days]
-        return Reply("Выберите день:", [*_rows(buttons, 2), back])
+        return Reply("Выберите день:", [*_grid(buttons, 2), back])
 
     def _times(self, service_id: int, master_id: int, day: date, note: str = "") -> Reply:
         service = self.catalog.services[service_id]
@@ -218,7 +222,7 @@ class BookingBot:
         buttons = [
             Button(f"{start:%H:%M}", f"t:{service_id}:{master_id}:{start:%Y%m%d%H%M}") for start in free
         ]
-        return Reply(f"{note}<b>{texts.day_long(day)}</b> — свободное время:", [*_rows(buttons, 4), back])
+        return Reply(f"{note}<b>{texts.day_long(day)}</b> — свободное время:", [*_grid(buttons, 4), back])
 
     def _pick_time(self, client: Client, service_id: int, master_id: int, start: datetime) -> Reply:
         service = self.catalog.services[service_id]
@@ -292,19 +296,17 @@ class BookingBot:
             return [self._menu(client.platform, client.user_id)]
         service = self.catalog.services[draft["service_id"]]
         start = datetime.fromisoformat(draft["start"])
+
+        def retry(note: str) -> Reply:
+            # обратно к времени того же дня и того же выбора мастера («любой» остаётся «любым»)
+            return self._times(service.id, draft["chosen_master_id"], start.date(), note=note)
+
         if start <= self.now():
             self._save(replace(client, draft={}), state=None)
             return [Reply("Это время уже прошло — выберите новое.", [[Button("📝 Записаться", "book")]])]
         # черновик мог пролежать долго: правило «не позже чем за min_lead_min до визита» проверяем снова
         if start < self.now() + timedelta(minutes=self.catalog.business.min_lead_min):
-            return [
-                self._times(
-                    service.id,
-                    draft["chosen_master_id"],
-                    start.date(),
-                    note="До визита осталось слишком мало времени. Выберите другое.\n\n",
-                )
-            ]
+            return [retry("До визита осталось слишком мало времени. Выберите другое.\n\n")]
         appt = self.storage.book(
             platform=client.platform,
             user_id=client.user_id,
@@ -317,14 +319,7 @@ class BookingBot:
             created_at=self.now(),
         )
         if appt is None:
-            return [
-                self._times(
-                    service.id,
-                    draft["chosen_master_id"],
-                    start.date(),
-                    note="Пока вы подтверждали, это время заняли. Выберите другое.\n\n",
-                )
-            ]
+            return [retry("Пока вы подтверждали, это время заняли. Выберите другое.\n\n")]
         self._save(replace(client, draft={}), state=None)
         await self._sync_sheet()
         await self._notify_admins(f"🆕 Новая запись\n\n{self._describe(appt, with_client=True)}")
@@ -364,7 +359,7 @@ class BookingBot:
     def _ask_cancel(self, platform: str, user_id: str, appointment_id: int) -> Reply:
         appt = self._own_active(platform, user_id, appointment_id)
         if appt is None:
-            return Reply("Эта запись уже отменена или прошла.", [_back("my")])
+            return _gone()
         return Reply(
             f"Отменить запись?\n\n{self._describe(appt)}",
             [[Button("Да, отменить", f"cy:{appt.id}"), Button("Нет, оставить", "my")]],
@@ -373,7 +368,7 @@ class BookingBot:
     async def _cancel(self, platform: str, user_id: str, appointment_id: int) -> list[Reply]:
         appt = self._own_active(platform, user_id, appointment_id)
         if appt is None:
-            return [Reply("Эта запись уже отменена или прошла.", [_back("my")])]
+            return [_gone()]
         self.storage.cancel(appt.id)
         await self._sync_sheet()
         await self._notify_admins(f"❌ Клиент отменил запись\n\n{self._describe(appt, with_client=True)}")

@@ -55,8 +55,8 @@ def build_xlsx(catalog: Catalog, appointments: list[Appointment]) -> bytes:
     ws.title = "Записи"
     ws.append([title for title, _ in COLUMNS])
     for idx, (_, width) in enumerate(COLUMNS, start=1):
-        ws.column_dimensions[ws.cell(row=1, column=idx).column_letter].width = width
         cell = ws.cell(row=1, column=idx)
+        ws.column_dimensions[cell.column_letter].width = width
         cell.font = Font(bold=True, color="FFFFFF")
         cell.fill = PatternFill("solid", fgColor="7B5EA7")
         cell.alignment = Alignment(horizontal="center")
