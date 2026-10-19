@@ -208,7 +208,8 @@ class BookingBot:
         days = open_days(self.catalog, self.storage, masters, service, self.now())
         back = _back(f"s:{service_id}")
         if not days:
-            return Reply("На ближайшие две недели свободных окон нет — выберите другого мастера.", [back])
+            horizon = texts.days(self.catalog.business.booking_days)
+            return Reply(f"Свободных окон на {horizon} вперёд нет — выберите другого мастера.", [back])
         buttons = [Button(texts.day_button(d), f"d:{service_id}:{master_id}:{d:%Y%m%d}") for d in days]
         return Reply("Выберите день:", [*_grid(buttons, 2), back])
 

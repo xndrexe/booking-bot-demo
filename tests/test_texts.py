@@ -47,3 +47,19 @@ def test_price(value, expected):
 )
 def test_normalize_phone_more(raw, expected):
     assert texts.normalize_phone(raw) == expected
+
+
+@pytest.mark.parametrize(
+    "n, expected",
+    [
+        (1, "1 день"),
+        (3, "3 дня"),
+        (5, "5 дней"),
+        (11, "11 дней"),
+        (14, "14 дней"),
+        (21, "21 день"),
+        (22, "22 дня"),
+    ],
+)
+def test_days(n, expected):
+    assert texts.days(n) == expected

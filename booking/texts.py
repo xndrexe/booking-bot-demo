@@ -44,6 +44,17 @@ def relative_day(start: datetime, now: datetime) -> str:
     return day_long(start.date())
 
 
+def days(n: int) -> str:
+    """«1 день», «3 дня», «14 дней»."""
+    if n % 10 == 1 and n % 100 != 11:
+        word = "день"
+    elif 2 <= n % 10 <= 4 and not 12 <= n % 100 <= 14:
+        word = "дня"
+    else:
+        word = "дней"
+    return f"{n} {word}"
+
+
 def price(value: int) -> str:
     return f"{value:,}".replace(",", " ") + " ₽"
 

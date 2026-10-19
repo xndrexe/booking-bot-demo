@@ -1,9 +1,11 @@
 """Диалог: команды, ввод имени, правка контактов, граничные случаи времени и напоминаний."""
 
+from dataclasses import replace
 from datetime import date, datetime
 
 from test_flow import CLIENT, book_haircut, datas, press, say
 
+from booking.flow import BookingBot
 from booking.slots import free_starts, open_days
 
 OWNER = ("tg", "1")
@@ -192,3 +194,11 @@ async def test_reminder_text_today(bot, clock, outbox):
 async def test_clock_seconds_are_dropped(bot, clock):
     clock.now = datetime(2026, 10, 14, 8, 0, 59, 123)
     assert bot.now() == datetime(2026, 10, 14, 8, 0)
+
+
+async def test_no_days_names_booking_horizon(catalog, storage, clock):
+    # горизонт в 1 день, а вечером сегодняшние окна уже закрыты
+    short = replace(catalog, business=replace(catalog.business, booking_days=1))
+    clock.now = datetime(2026, 10, 14, 23, 0)
+    reply = await press(BookingBot(short, storage, admins=set(), clock=clock), "m:1:1")
+    assert "Свободных окон на 1 день вперёд нет" in reply.text
