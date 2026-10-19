@@ -48,9 +48,28 @@ class Catalog:
     def masters_for(self, service_id: int) -> list[Master]:
         return [m for m in self.masters.values() if service_id in m.services]
 
+    # старые записи могут ссылаться на услугу или мастера, которых владелец уже убрал из каталога
+    def service_name(self, service_id: int) -> str:
+        service = self.services.get(service_id)
+        return service.name if service else f"услуга №{service_id} (нет в каталоге)"
+
+    def master_name(self, master_id: int) -> str:
+        master = self.masters.get(master_id)
+        return master.name if master else f"мастер №{master_id} (нет в каталоге)"
+
+
+def _unique_ids(items: list[dict], kind: str) -> None:
+    ids = [item["id"] for item in items]
+    duplicates = sorted({i for i in ids if ids.count(i) > 1})
+    if duplicates:
+        # без проверки второй элемент с тем же id молча затирал первый
+        raise ValueError(f"duplicate {kind} ids {duplicates}")
+
 
 def load_catalog(path: Path) -> Catalog:
     raw = json.loads(path.read_text(encoding="utf-8"))
+    _unique_ids(raw["services"], "service")
+    _unique_ids(raw["masters"], "master")
     services = {s["id"]: Service(**s) for s in raw["services"]}
     masters = {
         m["id"]: Master(
@@ -64,6 +83,12 @@ def load_catalog(path: Path) -> Catalog:
         )
         for m in raw["masters"]
     }
+    for service in services.values():
+        # услуга нулевой длины не пересекается ни с чем — один слот можно было бы занять дважды
+        if service.duration_min <= 0:
+            raise ValueError(
+                f"service {service.id}: duration_min must be positive, got {service.duration_min}"
+            )
     for master in masters.values():
         unknown = master.services - services.keys()
         if unknown:
@@ -73,4 +98,12 @@ def load_catalog(path: Path) -> Catalog:
             raise ValueError(f"master {master.id}: start {master.start} must be before end {master.end}")
         if not master.weekdays or not master.weekdays <= set(range(1, 8)):
             raise ValueError(f"master {master.id}: weekdays must be 1..7, got {sorted(master.weekdays)}")
-    return Catalog(business=Business(**raw["business"]), services=services, masters=masters)
+    business = Business(**raw["business"])
+    # при шаге 0 подбор окон в slots.free_starts не завершается
+    if business.slot_step_min <= 0:
+        raise ValueError(f"slot_step_min must be positive, got {business.slot_step_min}")
+    if business.booking_days <= 0:
+        raise ValueError(f"booking_days must be positive, got {business.booking_days}")
+    if business.min_lead_min < 0:
+        raise ValueError(f"min_lead_min must not be negative, got {business.min_lead_min}")
+    return Catalog(business=business, services=services, masters=masters)

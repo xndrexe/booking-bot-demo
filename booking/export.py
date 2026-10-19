@@ -30,17 +30,18 @@ def rows(catalog: Catalog, appointments: list[Appointment]) -> list[list]:
     """Строки таблицы записей без шапки; дата — объектом date."""
     out = []
     for number, appt in enumerate(appointments, start=1):
-        service = catalog.services[appt.service_id]
+        service = catalog.services.get(appt.service_id)
         out.append(
             [
                 number,
                 appt.start.date(),
                 appt.start.strftime("%H:%M"),
-                service.name,
-                catalog.masters[appt.master_id].name,
+                catalog.service_name(appt.service_id),
+                catalog.master_name(appt.master_id),
                 appt.client_name,
                 appt.phone,
-                service.price,
+                # услугу убрали из каталога — цены не знаем, ячейку оставляем пустой
+                service.price if service else None,
                 PLATFORMS.get(appt.platform, appt.platform),
                 "активна" if appt.status == ACTIVE else "отменена",
                 appt.created_at.strftime("%d.%m.%Y %H:%M"),

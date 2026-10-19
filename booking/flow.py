@@ -404,8 +404,8 @@ class BookingBot:
         if not items:
             return Reply("На сегодня записей нет.", [_back("menu")])
         lines = [
-            f"{a.start:%H:%M} — {escape(self.catalog.services[a.service_id].name)}, "
-            f"{escape(self.catalog.masters[a.master_id].name)}; "
+            f"{a.start:%H:%M} — {escape(self.catalog.service_name(a.service_id))}, "
+            f"{escape(self.catalog.master_name(a.master_id))}; "
             f"{escape(a.client_name)}, {a.phone}"
             for a in items
         ]
@@ -466,17 +466,17 @@ class BookingBot:
     # --- служебное ---
 
     def _describe(self, appt: Appointment, with_client: bool = False) -> str:
-        service = self.catalog.services[appt.service_id]
-        master = self.catalog.masters[appt.master_id]
-        text = f"💇 {escape(service.name)}\n👤 Мастер: {escape(master.name)}\n🗓 {texts.when(appt.start)}"
+        service = self.catalog.service_name(appt.service_id)
+        master = self.catalog.master_name(appt.master_id)
+        text = f"💇 {escape(service)}\n👤 Мастер: {escape(master)}\n🗓 {texts.when(appt.start)}"
         if with_client:
             text += f"\n🙋 {escape(appt.client_name)}, {appt.phone}"
         return text
 
     def _describe_short(self, appt: Appointment) -> str:
-        service = self.catalog.services[appt.service_id]
-        master = self.catalog.masters[appt.master_id]
-        return f"{texts.when(appt.start)} — {escape(service.name)}, {escape(master.name)}"
+        service = self.catalog.service_name(appt.service_id)
+        master = self.catalog.master_name(appt.master_id)
+        return f"{texts.when(appt.start)} — {escape(service)}, {escape(master)}"
 
     def _save(self, client: Client, *, state: str | None) -> None:
         self.storage.save_client(replace(client, state=state))

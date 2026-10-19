@@ -102,3 +102,59 @@ def test_load_settings_without_admins(monkeypatch):
     monkeypatch.setattr(config, "load_dotenv", lambda *a, **k: None)
     monkeypatch.delenv("ADMINS", raising=False)
     assert config.load_settings().admins == set()
+
+
+def write_raw(tmp_path, business=None, services=None, masters=None):
+    path = tmp_path / "catalog.json"
+    raw = {
+        "business": {**BUSINESS, **(business or {})},
+        "services": services or [{"id": 1, "name": "Стрижка", "duration_min": 60, "price": 1000}],
+        "masters": masters or [master()],
+    }
+    path.write_text(json.dumps(raw, ensure_ascii=False), encoding="utf-8")
+    return path
+
+
+@pytest.mark.parametrize(
+    ("business", "error"),
+    [
+        # шаг 0 раньше вешал подбор окон в бесконечном цикле
+        ({"slot_step_min": 0}, "slot_step_min must be positive"),
+        ({"slot_step_min": -15}, "slot_step_min must be positive"),
+        ({"booking_days": 0}, "booking_days must be positive"),
+        ({"min_lead_min": -1}, "min_lead_min must not be negative"),
+    ],
+)
+def test_load_catalog_rejects_bad_business_numbers(tmp_path, business, error):
+    with pytest.raises(ValueError, match=error):
+        load_catalog(write_raw(tmp_path, business=business))
+
+
+def test_load_catalog_accepts_zero_lead_time(tmp_path):
+    assert load_catalog(write_raw(tmp_path, business={"min_lead_min": 0})).business.min_lead_min == 0
+
+
+@pytest.mark.parametrize("duration", [0, -30])
+def test_load_catalog_rejects_non_positive_duration(tmp_path, duration):
+    services = [{"id": 1, "name": "Стрижка", "duration_min": duration, "price": 1000}]
+    with pytest.raises(ValueError, match="duration_min must be positive"):
+        load_catalog(write_raw(tmp_path, services=services))
+
+
+def test_load_catalog_rejects_duplicate_ids(tmp_path):
+    services = [
+        {"id": 1, "name": "Стрижка", "duration_min": 60, "price": 1000},
+        {"id": 1, "name": "Укладка", "duration_min": 30, "price": 800},
+    ]
+    with pytest.raises(ValueError, match="duplicate service ids \\[1\\]"):
+        load_catalog(write_raw(tmp_path, services=services))
+    with pytest.raises(ValueError, match="duplicate master ids \\[1\\]"):
+        load_catalog(write_raw(tmp_path, masters=[master(), master(name="Ирина")]))
+
+
+def test_names_fall_back_for_ids_missing_from_catalog(tmp_path):
+    catalog = load_catalog(write_raw(tmp_path))
+    assert catalog.service_name(1) == "Стрижка"
+    assert catalog.master_name(1) == "Анна"
+    assert catalog.service_name(9) == "услуга №9 (нет в каталоге)"
+    assert catalog.master_name(9) == "мастер №9 (нет в каталоге)"
