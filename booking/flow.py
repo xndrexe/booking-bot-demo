@@ -157,7 +157,8 @@ class BookingBot:
                     return [self._today()]
         except (IndexError, ValueError, KeyError, OverflowError):
             # OverflowError — подделанный id длиннее, чем влезает в INTEGER SQLite
-            log.warning("bad callback data %r from %s:%s", data, platform, user_id)
+            # длину кнопки MAX не ограничивает, как Telegram (64 байта) — в лог только начало
+            log.warning("bad callback data %r from %s:%s", data[:100], platform, user_id)
         return [self._menu(platform, user_id)]
 
     # --- экраны записи ---

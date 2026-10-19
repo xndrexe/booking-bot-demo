@@ -155,3 +155,12 @@ async def test_max_ignores_group_chats(bot, storage, monkeypatch):
 
     await dp.handle(max_text("Мария"))
     assert storage.get_client("max", "77").name == "Мария"
+
+
+async def test_forged_long_callback_logged_truncated(bot, caplog):
+    # подделанная кнопка из MAX может быть сколь угодно длинной — лог не должен раздуваться
+    with caplog.at_level("WARNING", logger="booking.flow"):
+        replies = await bot.handle_callback("max", "77", "s:" + "9" * 100_000)
+    assert replies
+    logged = [r.getMessage() for r in caplog.records if "bad callback" in r.getMessage()]
+    assert logged and len(logged[0]) < 200
