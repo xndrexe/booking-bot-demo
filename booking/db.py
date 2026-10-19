@@ -200,7 +200,9 @@ class Storage:
     def mark_reminded(self, appointment_id: int) -> None:
         self.conn.execute("UPDATE appointments SET reminded = 1 WHERE id = ?", (appointment_id,))
 
-    def busy_intervals(self, master_id: int, day_start: datetime, day_end: datetime):
+    def busy_intervals(
+        self, master_id: int, day_start: datetime, day_end: datetime
+    ) -> list[tuple[datetime, datetime]]:
         rows = self.conn.execute(
             """
             SELECT start, end FROM appointments

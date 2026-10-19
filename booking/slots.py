@@ -32,8 +32,7 @@ def free_starts(
 
     result = []
     start = opens
-    while start + duration <= closes:
-        end = start + duration
+    while (end := start + duration) <= closes:
         if start >= earliest and not any(b_start < end and b_end > start for b_start, b_end in busy):
             result.append(start)
         start += step

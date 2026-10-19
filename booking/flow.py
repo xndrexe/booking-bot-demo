@@ -21,7 +21,7 @@ from html import escape
 from typing import Protocol
 
 from booking import texts
-from booking.catalog import Catalog
+from booking.catalog import Catalog, Master
 from booking.db import ACTIVE, Appointment, Client, Storage
 from booking.export import build_xlsx, rows
 from booking.slots import free_by_time, open_days
@@ -31,6 +31,8 @@ log = logging.getLogger(__name__)
 ASK_NAME = "ask_name"
 ASK_PHONE = "ask_phone"
 REMIND_BEFORE = timedelta(hours=24)
+# образец номера в подсказках о телефоне; неразрывные пробелы не дают ему переноситься
+PHONE_EXAMPLE = "+7\u00a0900\u00a0123-45-67"
 
 
 @dataclass(frozen=True)
@@ -195,7 +197,7 @@ class BookingBot:
             buttons.append([Button("Любой свободный мастер", f"m:{service_id}:0")])
         return Reply(f"<b>{escape(service.name)}</b> — к кому записать?", [*buttons, _back("book")])
 
-    def _candidates(self, service_id: int, master_id: int):
+    def _candidates(self, service_id: int, master_id: int) -> list[Master]:
         if master_id == 0:
             return self.catalog.masters_for(service_id)
         master = self.catalog.masters[master_id]
@@ -257,12 +259,12 @@ class BookingBot:
         if not 2 <= len(name) <= 40:
             return Reply("Имя должно быть от 2 до 40 символов. Напишите ещё раз.")
         self._save(replace(client, name=name), state=ASK_PHONE)
-        return Reply("Телефон для связи — например, +7\u00a0900\u00a0123-45-67.", [_back("menu", "✖️ Отмена")])
+        return Reply(f"Телефон для связи — например, {PHONE_EXAMPLE}.", [_back("menu", "✖️ Отмена")])
 
     def _take_phone(self, client: Client, text: str) -> Reply:
         phone = texts.normalize_phone(text)
         if phone is None:
-            return Reply("Не похоже на номер. Напишите в формате +7\u00a0900\u00a0123-45-67.")
+            return Reply(f"Не похоже на номер. Напишите в формате {PHONE_EXAMPLE}.")
         client = replace(client, phone=phone)
         self._save(client, state=None)
         if not client.draft:
@@ -404,12 +406,10 @@ class BookingBot:
         items = self.storage.active_between(day_start, day_start + timedelta(days=1))
         if not items:
             return Reply("На сегодня записей нет.", [_back("menu")])
-        lines = [
-            f"{a.start:%H:%M} — {escape(self.catalog.service_name(a.service_id))}, "
-            f"{escape(self.catalog.master_name(a.master_id))}; "
-            f"{escape(a.client_name)}, {a.phone}"
-            for a in items
-        ]
+        lines = []
+        for a in items:
+            service, master = self._names(a)
+            lines.append(f"{a.start:%H:%M} — {service}, {master}; {escape(a.client_name)}, {a.phone}")
         return Reply("Записи на сегодня:\n\n" + "\n".join(lines), [_back("menu")])
 
     async def _sync_sheet(self) -> None:
@@ -466,18 +466,21 @@ class BookingBot:
 
     # --- служебное ---
 
+    def _names(self, appt: Appointment) -> tuple[str, str]:
+        """Названия услуги и мастера записи, уже экранированные для HTML."""
+        catalog = self.catalog
+        return escape(catalog.service_name(appt.service_id)), escape(catalog.master_name(appt.master_id))
+
     def _describe(self, appt: Appointment, with_client: bool = False) -> str:
-        service = self.catalog.service_name(appt.service_id)
-        master = self.catalog.master_name(appt.master_id)
-        text = f"💇 {escape(service)}\n👤 Мастер: {escape(master)}\n🗓 {texts.when(appt.start)}"
+        service, master = self._names(appt)
+        text = f"💇 {service}\n👤 Мастер: {master}\n🗓 {texts.when(appt.start)}"
         if with_client:
             text += f"\n🙋 {escape(appt.client_name)}, {appt.phone}"
         return text
 
     def _describe_short(self, appt: Appointment) -> str:
-        service = self.catalog.service_name(appt.service_id)
-        master = self.catalog.master_name(appt.master_id)
-        return f"{texts.when(appt.start)} — {escape(service)}, {escape(master)}"
+        service, master = self._names(appt)
+        return f"{texts.when(appt.start)} — {service}, {master}"
 
     def _save(self, client: Client, *, state: str | None) -> None:
         self.storage.save_client(replace(client, state=state))
