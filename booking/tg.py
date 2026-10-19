@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from aiogram import Bot, Dispatcher, F, Router
 from aiogram.client.default import DefaultBotProperties
-from aiogram.enums import ParseMode
+from aiogram.enums import ChatType, ParseMode
 from aiogram.types import (
     BufferedInputFile,
     CallbackQuery,
@@ -44,7 +44,9 @@ def build(core: BookingBot, token: str) -> tuple[Bot, Dispatcher]:
     bot = Bot(token, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
     router = Router()
 
-    @router.message(F.text)
+    # только личные чаты: в группе ответ ушёл бы всем участникам — вместе с выгрузкой
+    # телефонов клиентов по /export и сводкой записи с именем и номером
+    @router.message(F.text, F.chat.type == ChatType.PRIVATE)
     async def on_text(message: Message) -> None:
         for reply in await core.handle_text(PLATFORM, str(message.from_user.id), message.text):
             await send(bot, message.chat.id, reply)

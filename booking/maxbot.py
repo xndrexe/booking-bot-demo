@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from maxapi import Bot, Dispatcher
+from maxapi.enums.chat_type import ChatType
 from maxapi.enums.parse_mode import ParseMode
 from maxapi.types import BotStarted, CallbackButton, MessageCallback, MessageCreated
 from maxapi.types.input_media import InputMediaBuffer
@@ -48,6 +49,9 @@ def build(core: BookingBot, token: str) -> tuple[Bot, Dispatcher]:
     async def on_text(event: MessageCreated) -> None:
         message = event.message
         if message.sender is None or message.sender.is_bot or message.body is None or not message.body.text:
+            return
+        # только личный диалог: реплика из группы не должна попадать в запись (например, стать именем)
+        if message.recipient.chat_type != ChatType.DIALOG:
             return
         user_id = message.sender.user_id
         for reply in await core.handle_text(PLATFORM, str(user_id), message.body.text):

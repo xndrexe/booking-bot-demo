@@ -4,6 +4,8 @@ import io
 import sys
 import types
 
+from aiogram.types import Update
+from maxapi.types import MessageCreated
 from openpyxl import load_workbook
 from test_flow import CLIENT, book_haircut, datas, press, say
 
@@ -103,3 +105,53 @@ async def test_name_of_only_invisible_chars_rejected(bot):
     await press(bot, "t:1:1:202610151200")
     reply = await say(bot, "\u200b\u200b\u202e\u200b")
     assert "от 2 до 40" in reply.text
+
+
+async def test_telegram_ignores_group_chats(bot):
+    # владелец пишет /export в группе, куда добавлен бот: файл с телефонами не должен уйти группе
+    from test_adapters import FakeTelegram, tg_message
+
+    from booking import tg
+
+    bot.admins.add("tg:42")
+    tg_bot, dp = tg.build(bot, "42:TEST")
+    session = FakeTelegram()
+    tg_bot.session = session
+    for chat_type in ("group", "supergroup"):
+        raw = tg_message("/export").model_dump(mode="json", exclude_none=True, by_alias=True)
+        raw["message"]["chat"] = {"id": -100500, "type": chat_type}
+        await dp.feed_update(tg_bot, Update.model_validate(raw))
+    assert session.calls == []
+
+    await dp.feed_update(tg_bot, tg_message("/export"))
+    assert session.calls and session.calls[-1].chat_id == 42
+
+
+async def test_max_ignores_group_chats(bot, storage, monkeypatch):
+    # реплика клиента в группе не должна стать его именем на шаге ввода имени
+    from test_adapters import max_text
+
+    from booking import maxbot
+
+    max_bot, dp = maxbot.build(bot, "TEST")
+    sent = []
+
+    async def fake_send_message(**kwargs):
+        sent.append(kwargs)
+
+    async def no_network():
+        pass
+
+    monkeypatch.setattr(max_bot, "send_message", fake_send_message)
+    monkeypatch.setattr(dp, "check_me", no_network)
+    await dp.startup(max_bot)
+
+    await bot.handle_callback("max", "77", "edit")
+    raw = max_text("Всем привет").model_dump(mode="json", exclude_none=True)
+    raw["message"]["recipient"] = {"chat_id": 5, "chat_type": "chat"}
+    await dp.handle(MessageCreated.model_validate(raw))
+    assert sent == []
+    assert storage.get_client("max", "77").name is None
+
+    await dp.handle(max_text("Мария"))
+    assert storage.get_client("max", "77").name == "Мария"
