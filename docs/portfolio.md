@@ -8,4 +8,6 @@
 
 Проверено: Telegram — вживую на тестовом боте и на тестах; MAX — тот же сценарий, проверен на тестах без подключения; Google Таблица — на тестах без подключения.
 
+Снимки (настоящий Telegram): docs/screens/1-uslugi.png, 2-vremya.png, 3-zapisan.png, 4-moi-zapisi.png, 5-excel.png; вся запись одним снимком — ves-dialog.png; выгрузка — tablitsa.png.
+
 Стек: Python, aiogram 3, maxapi, SQLite, openpyxl, gspread.

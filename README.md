@@ -13,16 +13,17 @@
 
 ## Как выглядит
 
-| Выбор услуги и мастера | Свободное время и запись | Напоминание и отмена |
+| Услуга | Время | Запись готова |
 |---|---|---|
-| ![](docs/screens/1-usluga-i-master.png) | ![](docs/screens/2-vremya-i-zapis.png) | ![](docs/screens/3-napominanie-i-otmena.png) |
+| ![](docs/screens/1-uslugi.png) | ![](docs/screens/2-vremya.png) | ![](docs/screens/3-zapisan.png) |
 
-Владелец: уведомления и выгрузка — [снимок](docs/screens/4-vladelets.png),
-[таблица](docs/screens/5-tablitsa.png).
+| Мои записи | Владельцу: выгрузка в Excel |
+|---|---|
+| ![](docs/screens/4-moi-zapisi.png) | ![](docs/screens/5-excel.png) |
 
-Снимки собраны из настоящих ответов бота: тот же код, что работает в
-мессенджере, прогнан по сценарию, его сообщения и кнопки нарисованы в рамке
-чата (`tools/render_chat.py`).
+Снимки — настоящая переписка с тестовым ботом в Telegram. Вся запись от
+/start до выгрузки одним длинным снимком — [здесь](docs/screens/ves-dialog.png),
+выгрузка в Excel на выдуманных записях — [таблица](docs/screens/tablitsa.png).
 
 ## Что умеет
 
@@ -108,7 +109,7 @@ booking/
 data/catalog.json  услуги, мастера, график
 tests/             сценарии записи, отмены, напоминаний, выгрузки, оба адаптера,
                    каталог, настройки, защита от подделанных кнопок и ввода
-tools/             сборка снимков диалога для README
+tools/             снимок таблицы выгрузки для README
 ```
 
 Ядро получает от мессенджера текст или нажатую кнопку и возвращает ответ —
@@ -132,7 +133,7 @@ tools/             сборка снимков диалога для README
 .venv/bin/ruff check .
 ```
 
-Пересобрать снимки: `.venv/bin/python tools/render_chat.py` (HTML в `build/screens/`),
+Пересобрать снимок таблицы: `.venv/bin/python tools/render_sheet.py` (HTML в `build/screens/`),
 затем `.venv/bin/python tools/shoot.py` — PNG в `docs/screens/`. Для второго шага
 нужен Playwright с Chromium, его нет в `requirements-dev.txt`:
 `.venv/bin/pip install playwright && .venv/bin/playwright install chromium`.
