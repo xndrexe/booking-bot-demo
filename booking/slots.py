@@ -63,7 +63,7 @@ def open_days(
     now: datetime,
     limit: int = 8,
 ) -> list[date]:
-    """Ближайшие дни, где есть хоть одно окно, но не дальше горизонта записи."""
+    """Ближайшие дни, где есть хоть одно окно: не больше limit и не дальше горизонта записи."""
     days = []
     for offset in range(catalog.business.booking_days):
         day = now.date() + timedelta(days=offset)
