@@ -1,11 +1,13 @@
 """Каталог из JSON и настройки из окружения — без настоящего .env."""
 
+import asyncio
 import json
 from datetime import time
 from pathlib import Path
 
 import pytest
 
+from booking import __main__ as entry
 from booking import config
 from booking.catalog import load_catalog
 
@@ -158,3 +160,15 @@ def test_names_fall_back_for_ids_missing_from_catalog(tmp_path):
     assert catalog.master_name(1) == "Анна"
     assert catalog.service_name(9) == "услуга №9 (нет в каталоге)"
     assert catalog.master_name(9) == "мастер №9 (нет в каталоге)"
+
+
+def test_start_without_tokens_leaves_no_database(monkeypatch, tmp_path):
+    # без токенов бот всё равно не запустится — пустая база в папке клиента только путает
+    monkeypatch.setattr(config, "load_dotenv", lambda *a, **k: None)
+    monkeypatch.setenv("TG_BOT_TOKEN", "")
+    monkeypatch.setenv("MAX_BOT_TOKEN", "")
+    db = tmp_path / "data" / "booking.db"
+    monkeypatch.setenv("DB_PATH", str(db))
+    with pytest.raises(SystemExit, match="Нет токенов"):
+        asyncio.run(entry.main())
+    assert not db.exists()

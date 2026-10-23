@@ -30,6 +30,8 @@ async def reminder_loop(core: BookingBot) -> None:
 async def main() -> None:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
     settings = load_settings()
+    if not settings.tg_token and not settings.max_token:
+        raise SystemExit("Нет токенов: задайте TG_BOT_TOKEN и/или MAX_BOT_TOKEN в .env")
     catalog = load_catalog(settings.catalog_path)
     tz = ZoneInfo(catalog.business.timezone)
     settings.db_path.parent.mkdir(parents=True, exist_ok=True)
@@ -60,9 +62,6 @@ async def main() -> None:
         bot, dp = maxbot.build(core, settings.max_token)
         runners.append(dp.start_polling(bot))
         log.info("max: on")
-    if not runners:
-        raise SystemExit("Нет токенов: задайте TG_BOT_TOKEN и/или MAX_BOT_TOKEN в .env")
-
     await asyncio.gather(reminder_loop(core), *runners)
 
 
